@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veeva Vault Qdocs</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+
+        .display-area {
+            width: 100%;
+            height: 100%;
+            margin: 20px auto;
+            overflow-y: auto;
+        }
+
+        .container {
+            text-align: center;
+            width: 90%;
+            padding: 20px;
+            margin: 0 auto;
+        }
+
+        .input-field {
+            width: 60%;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 16px;
+            border-radius: 24px;
+            border: 1px solid #ddd;
+        }
+
+        .button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 24px;
+            background-color: #4285f4;
+            color: white;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background-color: #357ae8;
+        }
+
+        .error-message {
+            color: red;
+            margin-top: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f5f5f5;
+        }
+
+        .pagination {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .pagination button {
+            padding: 5px 10px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .pagination button:disabled {
+            background-color: #ddd;
+            cursor: not-allowed;
+        }
+
+        /* Modal styling */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding-top: 60px;
+        }
+
+        .modal-content {
+            background-color: orange;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 8px;
+            text-align: left;
+        }
+
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .modal-pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .modal-pagination button {
+            padding: 5px 10px;
+            margin: 0 5px;
+            background-color:grey;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .document-button {
+            display: block;
+            margin: 5px 0;
+            padding: 10px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            display: block;
+           width: 100%;
+            
+        }
+
+        .document-button:hover {
+            background-color: #357ae8;
+        }
+    </style>
+</head>
+<body>
+    <div class="display-area">
+        <div class="container">
+            <h2 style="color:rgb(240, 66, 13);">VEEVA VAULT QDOCS DOCUMENTS</h2>
+
+            <input type="text" id="search-input" class="input-field" placeholder="Enter search term...">
+            <button class="button" onclick="searchDocuments()">Search Documents</button>
+
+            <div id="error-message" class="error-message"></div>
+
+            <!-- Table to display the results -->
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th>Document Type</th>
+                        <th>Subtype</th>
+                        <th>Classification</th>
+                        <th>Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Table rows will be inserted dynamically here -->
+                </tbody>
+            </table>
+
+            <div id="pagination" class="pagination">
+                <button id="prev-page" onclick="prevPage()" disabled>Previous</button>
+                <button id="next-page" onclick="nextPage()">Next</button>
+            </div>
+        </div>
+
+        <!-- Modal Structure -->
+        <div id="modal" class="modal">
+            <div class="modal-content">
+                <span class="close-button" onclick="closeModal()">&times;</span>
+                <h3>Document Details</h3>
+                <div id="modal-document-details"></div>
+                <div class="modal-pagination">
+                    <button id="modal-prev-page" onclick="modalPrevPage()" disabled>Previous</button>
+                    <button id="modal-next-page" onclick="modalNextPage()">Next</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = '';
+        let documents = [];
+        let currentPage = 1;
+        const recordsPerPage = 10; // Display only 10 records per page
+
+        let modalDocuments = [];
+        let modalCurrentPage = 1;
+        const modalRecordsPerPage = 10;
+
+        window.onload = performLogin;
+
+        async function performLogin() {
+            const username = 'prana.user10@partnersi-prana4life.com';
+            const password = 'PranaU$er10';
+            const errorMessage = document.getElementById('error-message');
+
+            const formData = new URLSearchParams();
+            formData.append('username', username);
+            formData.append('password', password);
+
+            try {
+                const loginResponse = await fetch(
+                    'https://cors-anywhere.herokuapp.com/https://partnersi-prana4life-quality.veevavault.com/api/v24.2/auth',
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: formData,
+                    }
+                );
+
+                if (!loginResponse.ok) throw new Error('Login failed.');
+
+                const loginData = await loginResponse.json();
+                sessionId = loginData.sessionId;
+            } catch (error) {
+                errorMessage.innerText = error.message;
+            }
+        }
+
+        async function searchDocuments() {
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) return alert('Please enter a search term.');
+
+            try {
+                const response = await fetch(
+                    `https://cors-anywhere.herokuapp.com/https://partnersi-prana4life-quality.veevavault.com/api/v24.2/objects/documents?search=${encodeURIComponent(query)}&scope=all`,
+                    {
+                        headers: {
+                            Authorization: sessionId,
+                            Accept: 'application/json',
+                        },
+                    }
+                );
+
+                if (!response.ok) throw new Error('Search failed.');
+
+                const data = await response.json();
+                documents = data.documents;
+                const groupedData = groupDocumentsByType(documents);
+                displayGroupedDocuments(groupedData);
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        function groupDocumentsByType(documents) {
+            const grouped = {};
+
+            documents.forEach((doc) => {
+                const key = `${doc.document.type__v}-${doc.document.subtype__v}-${doc.document.classification__v}`;
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        type: doc.document.type__v || 'N/A',
+                        subtype: doc.document.subtype__v || 'N/A',
+                        classification: doc.document.classification__v || 'N/A',
+                        docs: [],
+                    };
+                }
+                grouped[key].docs.push(doc.document);
+            });
+
+            return Object.values(grouped);
+        }
+
+        function displayGroupedDocuments(groupedDocuments) {
+            const tbody = document.querySelector('#data-table tbody');
+            tbody.innerHTML = '';
+
+            groupedDocuments.forEach((group) => {
+                const row = tbody.insertRow();
+
+                row.insertCell(0).innerText = group.type;
+                row.insertCell(1).innerText = group.subtype;
+                row.insertCell(2).innerText = group.classification;
+
+                const countCell = row.insertCell(3);
+                countCell.innerText = group.docs.length;
+                countCell.style.cursor = 'pointer';
+                countCell.onclick = () => {
+                    modalDocuments = group.docs;
+                    modalCurrentPage = 1;
+                    displayModalPage();
+                    document.getElementById('modal').style.display = 'block';
+                };
+            });
+        }
+
+        function nextPage() {
+            currentPage++;
+            displayGroupedDocuments(documents);
+        }
+
+        function prevPage() {
+            currentPage--;
+            displayGroupedDocuments(documents);
+        }
+
+        function displayModalPage() {
+            const modalDetails = document.getElementById('modal-document-details');
+            modalDetails.innerHTML = '';
+
+            const start = (modalCurrentPage - 1) * modalRecordsPerPage;
+            const end = start + modalRecordsPerPage;
+            const currentDocs = modalDocuments.slice(start, end);
+
+            currentDocs.forEach((doc) => {
+                const button = document.createElement('button');
+                button.className = 'document-button';
+                button.innerText = doc.name__v;
+                button.onclick = () => window.open('https://partnersi-prana4life-quality.veevavault.com/ui/#object/training_requirement_impact_assessment__v/V3H000000002001?_layout=training_requirement_impact_assessment_d__c&expanded=details__c&s=0');
+                modalDetails.appendChild(button);
+            });
+
+            document.getElementById('modal-prev-page').disabled = modalCurrentPage === 1;
+            document.getElementById('modal-next-page').disabled = end >= modalDocuments.length;
+        }
+
+        function modalPrevPage() {
+            modalCurrentPage--;
+            displayModalPage();
+        }
+
+        function modalNextPage() {
+            modalCurrentPage++;
+            displayModalPage();
+        }
+
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
